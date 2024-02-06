@@ -1,1 +1,1 @@
-# iasalud-lab-1
+# IA en Salud - Lab 1
