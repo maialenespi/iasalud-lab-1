@@ -1,0 +1,24 @@
+project: "lab-1"
+entity: "reeses"
+name: "mlp_C"
+method: 'bayes' 
+
+metric: 
+  name: 'auc'
+  goal: 'maximize'   
+
+parameters:
+  preprocessing:
+      values: ['None', 'normalizer_max', 'normalizer_l1', 'normalizer_l2', 'minmaxscaler', 'standarizer']
+  hidden_size:
+    values: [2, 4, 8, 16, 32, 64, 128, 256, 512, 1024]
+  num_layers:
+    min: 0
+    max: 5
+    distribution: int_uniform
+  weight:
+    values: ['None', 'yes']
+  l2:
+    min: 0.0
+    max: 0.2
+    distribution: uniform

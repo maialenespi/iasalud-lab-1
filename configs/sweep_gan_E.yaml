@@ -1,0 +1,14 @@
+project: "lab-1"
+entity: "reeses"
+name: "gan_E"
+method: 'grid' 
+
+metric: 
+  name: 'roc_auc'
+  goal: 'maximize'   
+
+parameters:
+  model:
+    values: ['random_forest', 'logistic_regression', 'mlp']
+  gan:
+    values: ['None', 'yes']

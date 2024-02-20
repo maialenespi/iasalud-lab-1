@@ -1,0 +1,48 @@
+project: "lab-1"
+entity: "reeses"
+name: "experimento2"
+
+preprocessing: "normalizer_l2"
+reduc_func: "None"
+model_function: "mlp"
+
+None: None
+
+ae:
+  n_components: 2
+  preprocessing: "minmaxscaler"
+
+pca:
+  n_components: 2
+  whiten: true
+
+tsne:
+  n_components: 2
+  perplexity: 30
+  n_jobs: 4
+
+umap:
+  n_neighbors: 15
+  min_dist: 0.1
+  n_components: 2
+  metric: 'euclidean'
+
+random_forest:
+  n_estimators: 100
+  criterion: 'gini'
+  max_depth: None
+  min_samples_split: 2
+  min_samples_leaf: 1
+  n_jobs: 4
+  class_weight: 'balanced'
+
+logistic_regression:
+  class_weight: 'balanced'
+  penalty: 'l2'
+
+mlp:
+  hidden_size: 256
+  num_layers: 5
+
+
+validation: "kfolds"
