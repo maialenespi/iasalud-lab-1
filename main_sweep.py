@@ -14,26 +14,37 @@ def main():
     config = run.config
     torch.manual_seed(0)
 
-    prep = {'func': config.preprocessing}
+    prep = {'func': 'normalizer_l2'}
 
     reduc = {'func': 'None',
             'params': {}}
     
+    model_func = config.model
     if model_func=='mlp':
         model = {'func': model_func,
-                'params': {'hidden_size': config.hidden_size,
-                            'num_layers': config.num_layers}
+                'params': {'hidden_size': 64,
+                            'num_layers': 4}
                 }
-    else:
+    elif model_func=='cnn':
         model = {'func': model_func,
                 'params': {'hidden_size': config.hidden_size,
                             'num_layers': config.num_layers,
                             'kernel_size': config.kernel_size,
                             'stride': config.stride}
                 }
+    elif model_func=='random_forest':
+        model = {'func': model_func,
+                 'params': {'class_weight': 'balanced',
+                            'n_jobs': -1}}
+        
+    elif model_func=='logistic_regression':
+        model = {'func': model_func,
+                 'params': {'class_weight': 'balanced',
+                            'penalty': 'l2'}}
     
-    tr_params = {'weight': config.weight,
-                'l2': config.l2}
+    tr_params = {'weight': 'yes',
+                'l2': 0.03,
+                'gan': config.gan}
     
     validation = {'func': "kfolds"}
 
@@ -44,15 +55,19 @@ def main():
     results = {
                 'accuracy': metrics[0],
                 'precision': metrics[1],
-                'auc': metrics[2]
+                'recall': metrics[2],
+                'pr_auc': metrics[3],
+                'roc_auc': metrics[4]
                 }
     # Guardar los resultados en wandb
     for metric in results.keys():
         #print(f"{metric}", results[metric])
         wandb.run.summary[f"{metric}"] = results[metric]
     #wandb.log(results)
-    wandb.log({'auc': results['auc']})
+    wandb.log({'roc_auc': results['roc_auc']})
     wandb.log({'precision': results['precision']})
+    wandb.log({'recall': results['recall']})
+    wandb.log({'pr_auc': results['pr_auc']})
     wandb.log({'accuracy': results['accuracy']})
     wandb.save(config_file)
     #print(results)
@@ -86,11 +101,10 @@ def run_pipeline(data, preprocessing, reduction, model, tr_params, validation):
     
 
 if __name__ == "__main__":
-    config_file = 'configs/sweep_cnn_E.yaml'
+    config_file = 'configs/sweep_gan_C.yaml'
     with open(config_file, 'r') as f:
         sweep_config = yaml.safe_load(f)
 
-    global model_func, t
+    global t
     t = config_file[:-6]
-    model_func = config_file.split('configs/sweep_')[-1][:3]
     initialize_wandb(sweep_config)

@@ -35,19 +35,26 @@ class MLP(nn.Module):
     def __init__(self, input_size, hidden_size, num_layers, output_size):
         super(MLP, self).__init__()
 
-        self.fc_input = nn.Linear(input_size[1], hidden_size)
-        self.hidden_layers = nn.ModuleList([
-            nn.Linear(hidden_size, hidden_size) for _ in range(num_layers)
-        ])
-        self.fc_output = nn.Linear(hidden_size, output_size)
-        self.activation = nn.LeakyReLU()
-        
+        if num_layers == 0:
+            self.fc_input = nn.Linear(input_size, output_size)
+        else:
+            self.fc_input = nn.Linear(input_size, hidden_size)
+            self.hidden_layers = nn.ModuleList([
+                nn.Linear(hidden_size, hidden_size) for _ in range(num_layers - 1)
+            ])
+            self.fc_output = nn.Linear(hidden_size, output_size)
+            self.activation = nn.LeakyReLU()
+
     def forward(self, x):
-        x = self.activation(self.fc_input(x))
-        for layer in self.hidden_layers:
-            x = self.activation(layer(x))
-        #x = self.fc_output(x)
+        if hasattr(self, 'fc_output'):  # Si hay capas ocultas
+            x = self.activation(self.fc_input(x))
+            for layer in self.hidden_layers:
+                x = self.activation(layer(x))
+            x = self.fc_output(x)
+        else:  # Si no hay capas ocultas
+            x = self.fc_input(x)
         return x
+
     
 
 class CNN(nn.Module):
@@ -59,11 +66,9 @@ class CNN(nn.Module):
                 self.conv_blocks.append(self._make_conv_block(1, hidden_size, kernel_size, stride))
                 continue
             else:
-                self.conv_blocks.append(self._make_conv_block(hidden_size, hidden_size // 2, kernel_size, stride))
-            if hidden_size >= 2:
-                hidden_size = hidden_size // 2
-            else:
-                hidden_size = 2
+                self.conv_blocks.append(self._make_conv_block(hidden_size, hidden_size * 2, kernel_size, stride))
+                hidden_size = hidden_size *2
+
         self.fc1 = nn.Linear(self._get_conv_output(input_size), 32)
         self.fc2 = nn.Linear(32, 16)
         self.fc3 = nn.Linear(16, output_size)

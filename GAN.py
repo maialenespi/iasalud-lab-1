@@ -143,7 +143,7 @@ def train(dataloader, type):
         print(f"Epoch [{epoch + 1}/{n_epochs}] - D loss: {D_losses[-1]:.4f}, G Loss: {G_losses[-1]:.4f}- ", end='')
         print(f"D on real data: {D_real_l[-1]:.4f} - D on fake data: {D_fake_l[-1]:.4f}\n")
 
-        if epoch>100 and D_real_l[-1] >0.49 and D_real_l[-1]<0.51 and D_fake_l[-1]>0.49 and D_fake_l[-1]<0.51:
+        if epoch>100 and D_real_l[-1] >0.497 and D_real_l[-1]<0.503 and D_fake_l[-1]>0.497 and D_fake_l[-1]<0.503:
             print("Converged")
             break
 
@@ -173,7 +173,7 @@ def plot(G_losses, D_losses, D_real_l, D_fake_l, t):
 
 if __name__ == "__main__":
     df = create_dataset()
-    df =  preprocess_data(df, 'normalizer_max')
+    df =  preprocess_data(df, 'normalizer_l2')
     X_E = df[df['Erythromycin'] == 1].iloc[:, :-2].values
     X_C = df[df['Ciprofloxacin'] == 1].iloc[:, :-2].values
 
@@ -224,12 +224,12 @@ if __name__ == "__main__":
 
     gen_E = gen_E.view(-1).cpu().numpy()
     plt.figure(figsize=(10,5))
-    plt.plot(gen_E/np.max(gen_E))
+    plt.plot(gen_E)
     plt.savefig("generated_E.png")
 
     gen_C = gen_C.view(-1).cpu().numpy()
     plt.figure(figsize=(10,5))
-    plt.plot(gen_C/np.max(gen_C))
+    plt.plot(gen_C)
     plt.savefig("generated_C.png")
 
 
@@ -239,7 +239,7 @@ if __name__ == "__main__":
         gen_E = G_E(noise_E)
         gen_C = G_C(noise_C)
 
-    gen_E = normalize(gen_E.cpu().numpy(), norm='max')
-    gen_C = normalize(gen_C.cpu().numpy(), norm='max')
+    gen_E = normalize(gen_E.cpu().numpy(), norm='l2')
+    gen_C = normalize(gen_C.cpu().numpy(), norm='l2')
     joblib.dump(gen_E, 'fake_E.pkl')
     joblib.dump(gen_C, 'fake_C.pkl')

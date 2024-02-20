@@ -30,12 +30,16 @@ def main(config_file, data):
     results = {'Modelo Erythromycin': {
                 'accuracy': metrics[0][0],
                 'precision': metrics[0][1],
-                'auc': metrics[0][2]
+                'recall': metrics[0][2],
+                'pr_auc': metrics[0][3],
+                'roc_auc': metrics[0][4]
                 },
                 'Modelo Ciprofloxacin': {
                 'accuracy': metrics[1][0],
                 'precision': metrics[1][1],
-                'auc': metrics[1][2]}
+                'recall': metrics[1][2],
+                'pr_auc': metrics[1][3],
+                'roc_auc': metrics[1][4]}
                 }
     # Guardar los resultados en wandb
     for modelo in results.keys():
@@ -68,7 +72,8 @@ def run_pipeline(data, preprocessing, reduction, model, validation):
         Y_C = data["Ciprofloxacin"]
 
     tr_params = {'weight': 'yes',
-                'l2': 0.19147046756702232}
+                'l2': 0.02,
+                'resampling': 'random'}
 
     metrics_E = train_model(X, Y_E, model_func, model_params, tr_params, validation_func, 'E')
     metrics_C = train_model(X, Y_C, model_func, model_params, tr_params, validation_func, 'C')

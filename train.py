@@ -3,7 +3,7 @@ import pandas as pd
 import json
 from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import roc_auc_score, roc_curve
+from sklearn.metrics import roc_auc_score, roc_curve, recall_score
 import matplotlib.pyplot as plt
 import numpy as np
 from sklearn.ensemble import RandomForestClassifier
@@ -19,8 +19,9 @@ import torch.optim as optim
 import torch.nn as nn
 from train_models import fit, test, plot_metrics
 from dataset_mng import create_and_split_dataset
-from sklearn.metrics import classification_report, confusion_matrix
-
+from sklearn.metrics import classification_report, confusion_matrix, average_precision_score
+import joblib
+from imblearn.over_sampling import SMOTE, RandomOverSampler
 
 def train_model(X, Y, model, model_params, training_params, eval_type, type):
     torch.manual_seed(0)
@@ -28,8 +29,16 @@ def train_model(X, Y, model, model_params, training_params, eval_type, type):
         if value == 'None':
             model_params[key] = None
 
+    if type=='E':
+        fake = joblib.load('fake_E.pkl')
+    else:
+        fake = joblib.load('fake_C.pkl')
+
+    smote = SMOTE(sampling_strategy=0.65, random_state=42)
+    rnd = RandomOverSampler(sampling_strategy=0.65, random_state = 42)
+
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
- 
+
     pytorch_models = ['mlp', 'cnn']
     if isinstance(X, tuple):
         Y_train, Y_val, Y_test = Y
@@ -37,12 +46,6 @@ def train_model(X, Y, model, model_params, training_params, eval_type, type):
     else:
         X_train, X_val, X_test = X, X, X
         Y_train, Y_val, Y_test = Y, Y, Y
-    Y_val = torch.from_numpy(Y_val.values).to(device, dtype = torch.float32)
-    X_val = torch.from_numpy(X_val.values).to(device, dtype = torch.float32)
-    Y_train = torch.from_numpy(Y_train.values).to(device, dtype = torch.float32)
-    X_train = torch.from_numpy(X_train.values).to(device, dtype = torch.float32)
-    Y_test = torch.from_numpy(Y_test.values).to(device, dtype = torch.float32)
-    X_test = torch.from_numpy(X_test.values).to(device, dtype = torch.float32)
 
     if model == 'random_forest':
         model_params['n_jobs'] = 4
@@ -61,28 +64,53 @@ def train_model(X, Y, model, model_params, training_params, eval_type, type):
             accuracies = []
             precisions = []
             aucs = []
+            recalls = []
+            pr_aucs = []
 
             for train_index, test_index in kf.split(X, Y):
                 X_train, X_test = X.iloc[train_index], X.iloc[test_index]
                 Y_train, Y_test = Y.iloc[train_index], Y.iloc[test_index]
+
+                
+                if training_params['resampling']=='gan':
+                    num_1 = np.sum(Y_train == 1)
+                    num_0 = np.sum(Y_train == 0)
+                    missing_samples = num_0 - num_1
+                    indices = np.random.permutation(fake.shape[0])[:missing_samples]
+                    selected_fake = fake[indices]
+                    labels = np.ones(selected_fake.shape[0])
+                    X_train = np.concatenate([X_train, selected_fake], axis=0)
+                    Y_train = np.concatenate([Y_train, labels], axis=0)
+
+                if training_params['resampling']=='smote':
+                    X_train, Y_train = smote.fit_resample(X_train, Y_train)
+
+                if training_params['resampling']=='random':
+                    X_train, Y_train = rnd.fit_resample(X_train, Y_train)
 
                 clf.fit(X_train, Y_train)
                 Y_pred = clf.predict(X_test)
 
                 accuracy = accuracy_score(Y_test, Y_pred)
                 precision = precision_score(Y_test, Y_pred)
+                recall = recall_score(Y_test, Y_pred)
 
                 auc = roc_auc_score(Y_test, clf.predict_proba(X_test)[:, 1])
+                pr_auc = average_precision_score(Y_test, clf.predict_proba(X_test)[:, 1])
 
                 accuracies.append(accuracy)
                 precisions.append(precision)
                 aucs.append(auc)
+                recalls.append(recall)
+                pr_aucs.append(pr_auc)
 
             avg_accuracy = sum(accuracies) / len(accuracies)
             avg_precision = sum(precisions) / len(precisions)
             avg_auc = sum(aucs) / len(aucs)
+            avg_recalls = sum(recalls) / len(recalls)
+            avg_pr_aucs = sum(pr_aucs) / len(pr_aucs)
 
-            return avg_accuracy, avg_precision, avg_auc
+            return avg_accuracy, avg_precision, avg_recalls, avg_pr_aucs, avg_auc
         
         elif eval_type == 'split_test':
             X_train, X_val, X_test = X
@@ -91,15 +119,24 @@ def train_model(X, Y, model, model_params, training_params, eval_type, type):
             clf.fit(X_train, Y_train)
             Y_pred = clf.predict(X_val)
 
-            print(classification_report(Y_val, Y_pred))
-            print(confusion_matrix(Y_val, Y_pred))
+            
             accuracy = accuracy_score(Y_val, Y_pred)
             precision = precision_score(Y_val, Y_pred)
+            recall = recall_score(Y_val, y_pred)
             auc = roc_auc_score(Y_val, clf.predict_proba(X_val)[:, 1])
 
-            return accuracy, precision, auc
+            return accuracy, precision, recall, auc
         
     else:
+        Y_val = torch.from_numpy(Y_val.values).to(device, dtype = torch.float32)
+        X_val = torch.from_numpy(X_val.values).to(device, dtype = torch.float32)
+        Y_train = torch.from_numpy(Y_train.values).to(device, dtype = torch.float32)
+        X_train = torch.from_numpy(X_train.values).to(device, dtype = torch.float32)
+        Y_test = torch.from_numpy(Y_test.values).to(device, dtype = torch.float32)
+        X_test = torch.from_numpy(X_test.values).to(device, dtype = torch.float32)
+
+        fake = torch.from_numpy(fake).to(dtype = torch.float32)
+
         try:
             model_params['input_size'] = X.values.shape
         except: 
@@ -113,7 +150,7 @@ def train_model(X, Y, model, model_params, training_params, eval_type, type):
 
         epochs = 200
         patience = 5
-        batch_size = 32
+        batch_size = 128
 
         if eval_type == 'split_test':
             if model == 'mlp':
@@ -150,18 +187,19 @@ def train_model(X, Y, model, model_params, training_params, eval_type, type):
                 else:
                     y_pred[i] = 0.0
             
-            print(classification_report(Y_val, y_pred))
-            print(confusion_matrix(Y_val, y_pred))
             accuracy = accuracy_score(Y_val, y_pred)
             precision = precision_score(Y_val, y_pred)
+            recall = recall_score(Y_val, y_pred)
 
-            return accuracy, precision, auc
+            return accuracy, precision, recall, auc
         
         else:
             kf = StratifiedKFold(n_splits=10, shuffle=True, random_state=42)
             accuracies = []
             precisions = []
             aucs = []
+            pr_aucs = []
+            recalls = []
 
             X = torch.from_numpy(X.values)
             Y = torch.from_numpy(Y.values)
@@ -181,6 +219,27 @@ def train_model(X, Y, model, model_params, training_params, eval_type, type):
                 X_train_fold, X_val_fold = X[train_index], X[val_index]
                 Y_train_fold, Y_val_fold = Y[train_index], Y[val_index]
 
+                if training_params['resampling']=='gan':
+                    num_1 = torch.sum(Y_train_fold == 1).item()
+                    num_0 = torch.sum(Y_train_fold == 0).item()
+                    missing_samples = num_0 - num_1
+                    indices = torch.randperm(fake.shape[0])[:missing_samples]
+                    selected_fake = fake[indices]
+                    labels = torch.ones(selected_fake.size(0))
+                    X_train_fold = torch.cat([X_train_fold, selected_fake], dim=0)
+                    Y_train_fold = torch.cat([Y_train_fold, labels], dim=0)
+
+                elif training_params['resampling']=='smote':
+                    X_train_fold, Y_train_fold = smote.fit_resample(X_train_fold.cpu().numpy(), Y_train_fold.cpu().numpy())
+                    X_train_fold = torch.from_numpy(X_train_fold)
+                    Y_train_fold = torch.from_numpy(Y_train_fold)
+
+                elif training_params['resampling']=='random':
+                    X_train_fold, Y_train_fold = rnd.fit_resample(X_train_fold.cpu().numpy(), Y_train_fold.cpu().numpy())
+                    X_train_fold = torch.from_numpy(X_train_fold)
+                    Y_train_fold = torch.from_numpy(Y_train_fold)
+
+
                 train_set_fold = TensorDataset(X_train_fold, Y_train_fold)
                 val_set_fold = TensorDataset(X_val_fold, Y_val_fold)
 
@@ -195,6 +254,7 @@ def train_model(X, Y, model, model_params, training_params, eval_type, type):
 
 
                 auc_fold = roc_auc_score(Y_val_fold, y_pred_fold.cpu())
+                pr_auc = average_precision_score(Y_val_fold, y_pred_fold.cpu())
 
                 for i in range(y_pred_fold.shape[0]):
                     if y_pred_fold[i]>=0.5:
@@ -203,16 +263,21 @@ def train_model(X, Y, model, model_params, training_params, eval_type, type):
                         y_pred_fold[i] = 0
                 accuracy_fold = accuracy_score(Y_val_fold, y_pred_fold.cpu())
                 precision_fold = precision_score(Y_val_fold, y_pred_fold.cpu())
+                recall_fold = recall_score(Y_val_fold, y_pred_fold.cpu())
 
                 accuracies.append(accuracy_fold)
                 precisions.append(precision_fold)
                 aucs.append(auc_fold)
+                recalls.append(recall_fold)
+                pr_aucs.append(pr_auc)
 
             avg_accuracy = sum(accuracies) / len(accuracies)
             avg_precision = sum(precisions) / len(precisions)
             avg_auc = sum(aucs) / len(aucs)
+            avg_recall = sum(recalls)  / len(recalls)
+            avg_pr_auc = sum(pr_aucs) / len(pr_aucs)
 
-            return avg_accuracy, avg_precision, avg_auc
+            return avg_accuracy, avg_precision, avg_recall, avg_pr_auc, avg_auc
 
 
 
