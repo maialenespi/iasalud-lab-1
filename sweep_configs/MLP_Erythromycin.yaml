@@ -1,0 +1,18 @@
+project: "lab-1"
+entity: "reeses"
+name: "MLP_E"
+method: 'bayes' 
+
+metric: 
+  name: 'AUC_ROC'
+  goal: 'maximize'  
+
+parameters:
+  hidden_dim:
+    values: [32, 64, 128, 256]
+  hidden_act:
+    values: ["relu", "sigmoid", "tanh", "linear"]
+  n_layers:
+    values: [0, 1, 2, 3, 4]
+  class_weight:
+    values: [null, "balanced"]

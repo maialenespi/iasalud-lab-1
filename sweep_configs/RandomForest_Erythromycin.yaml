@@ -1,0 +1,14 @@
+project: "lab-1"
+entity: "reeses"
+name: "RandomForest_E"
+method: 'grid' 
+
+metric: 
+  name: 'AUC_ROC'
+  goal: 'maximize'  
+
+parameters:
+  n_estimators:
+    values: [10, 50, 100, 200]
+  class_weight:
+    values: [null, 'balanced']

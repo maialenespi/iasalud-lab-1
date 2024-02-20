@@ -1,0 +1,14 @@
+project: "lab-1"
+entity: "reeses"
+name: "logistic_E"
+method: 'grid' 
+
+metric: 
+  name: 'AUC_ROC'
+  goal: 'maximize'
+
+parameters:
+  penalty:
+    values: [null, 'l2']
+  class_weight:
+    values: [null, 'balanced']
