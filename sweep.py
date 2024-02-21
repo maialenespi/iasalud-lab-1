@@ -11,11 +11,11 @@ import pandas as pd
 import wandb
 import yaml
 
-CONFIG_FILE = "./sweep_configs/MLP_Erythromycin.yaml"
+CONFIG_FILE = "./sweep_configs/CNN_Erythromycin.yaml"
 MODEL, ANTIBIOTIC = CONFIG_FILE.split("/")[2].split(".")[0].split("_")
 
 def setup_dataset():
-    df = pd.read_csv(f"train_{ANTIBIOTIC[0]}.csv")
+    df = pd.read_csv(f"data/train_{ANTIBIOTIC[0]}.csv")
     X = df.drop(ANTIBIOTIC, axis=1).values
     y = df[ANTIBIOTIC].values
     return X, y
@@ -39,6 +39,9 @@ def train():
 
     for train_index, val_index in skf.split(X, y):
         X_train, X_val, y_train, y_val = X[train_index], X[val_index], y[train_index], y[val_index]
+
+        # TODO: RESCALADO
+        # TODO: RESAMPLING
         
         if MODEL in ["LogisticRegression", "RandomForest"]:
             if MODEL == "LogisticRegression":
@@ -46,7 +49,7 @@ def train():
             elif MODEL == "RandomForest":
                 model = RandomForestClassifier(random_state = 42, n_estimators = config.n_estimators, class_weight = config.class_weight)
             model.fit(X_train, y_train)
-            y_pred, y_proba = model.predict(X_val)
+            y_pred = model.predict(X_val)
             y_proba = model.predict_proba(X_val)[:, 1]
 
         elif MODEL in ["MLP", "CNN"]:
@@ -61,7 +64,7 @@ def train():
 
             elif MODEL == "CNN":
                 model = models.Sequential()
-                model.add(Conv1D(config.hidden_dim, kernel_size=config.kernel_size, activation=config.hidden_act, input_shape=X_train.shape))
+                model.add(Conv1D(config.hidden_dim, kernel_size=config.kernel_size, activation=config.hidden_act, input_shape=(X_train.shape[1], 1)))
                 model.add(Flatten())
                 model.add(Dense(1, activation='sigmoid'))
             
