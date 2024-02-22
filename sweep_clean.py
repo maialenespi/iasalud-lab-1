@@ -1,22 +1,21 @@
 from sklearn.model_selection import StratifiedKFold
+from mlmodels import LogisticRegression, RandomForest, MLP
 from sklearn.preprocessing import Normalizer
-from mlmodels import LogisticRegression, RandomForest, MLP_TF, CNN_TF
 from imblearn.over_sampling import SMOTE, RandomOverSampler
 
+import joblib
 import numpy as np
-import tensorflow as tf
 import pandas as pd
 import wandb
 import yaml
-import joblib
 
-MODEL = MLP_TF
+CONFIG_FILE = "./sweep_configs/MLP_Erythromycin.yaml"
+MODEL = MLP
 ANTIBIOTIC = "Erythromycin"
-ALGORITHM = 'MLP'
-CONFIG_FILE = f"./sweep_configs/{ALGORITHM}_{ANTIBIOTIC}.yaml"
 N_SPLITS = 5
-RESAMPLER = 'GAN'
 SCALING = Normalizer(norm='l2')
+RESAMPLER = 'SMOTE'
+
 
 def setup_dataset():
     df = pd.read_csv(f"./data/train_{ANTIBIOTIC[0]}.csv")
@@ -25,18 +24,17 @@ def setup_dataset():
     return X, y
 
 X, y = setup_dataset()
-if SCALING != 'None':
+if SCALING:
     X = SCALING.fit_transform(X)
 
 def train():
     run = wandb.init()
-    config = run.config.as_dict()
+    config = run.config
     metrics = {"AUC_ROC": [], "AUC_PR": [], "Accuracy": [], "Precision": [], "Recall": [], "F1": []}
     skf = StratifiedKFold(n_splits = N_SPLITS, shuffle = True, random_state = 42)
 
     for train_index, val_index in skf.split(X, y):
         X_train, X_val, y_train, y_val = X[train_index], X[val_index], y[train_index], y[val_index]
-        X_train, y_train = resample(X_train, y_train)
         model = MODEL(config)
         model.fit(X_train, y_train, X_val, y_val)
         metrics = model.evaluate(X_val, y_val, metrics)
@@ -61,7 +59,6 @@ def resample(x, y):
         ros = RandomOverSampler(random_state=42)
         x, y = ros.fit_resample(x, y)
     return x, y
-
 
 if __name__ == "__main__":
     with open(CONFIG_FILE, 'r') as f:
